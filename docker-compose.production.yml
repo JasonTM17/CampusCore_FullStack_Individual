@@ -1,5 +1,8 @@
 version: '3.8'
 
+# Production deployment using Docker Hub images
+# Usage: docker-compose -f docker-compose.production.yml up -d
+
 services:
   # PostgreSQL Database
   postgres:
@@ -7,7 +10,7 @@ services:
     container_name: campuscore-db
     environment:
       POSTGRES_USER: campuscore
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-campuscore_password}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: campuscore
     ports:
       - "5432:5432"
@@ -35,19 +38,14 @@ services:
       retries: 5
     restart: unless_stopped
 
-  # Backend API (NestJS)
+  # Backend API (from Docker Hub)
   backend:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
-      args:
-        DOCKERHUB_USERNAME: ${DOCKERHUB_USERNAME:-yourdockerhubusername}
     image: nguyenson1710/campuscore-backend:${IMAGE_TAG:-latest}
     container_name: campuscore-api
     environment:
-      DATABASE_URL: postgresql://campuscore:${POSTGRES_PASSWORD:-campuscore_password}@postgres:5432/campuscore
-      JWT_SECRET: ${JWT_SECRET:-change-this-jwt-secret-in-production}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change-this-refresh-secret-in-production}
+      DATABASE_URL: postgresql://campuscore:${POSTGRES_PASSWORD}@postgres:5432/campuscore
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       JWT_EXPIRATION: 15m
       JWT_REFRESH_EXPIRATION: 7d
       REDIS_URL: redis://redis:6379
@@ -61,36 +59,19 @@ services:
       redis:
         condition: service_healthy
     restart: unless_stopped
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
 
-  # Frontend (Next.js)
+  # Frontend (from Docker Hub)
   frontend:
-    build:
-      context: .
-      dockerfile: frontend/Dockerfile
-      args:
-        DOCKERHUB_USERNAME: ${DOCKERHUB_USERNAME:-yourdockerhubusername}
     image: nguyenson1710/campuscore-frontend:${IMAGE_TAG:-latest}
     container_name: campuscore-web
     environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
       NODE_ENV: production
     ports:
       - "3001:3000"
     depends_on:
       - backend
     restart: unless_stopped
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
 
   # Nginx Reverse Proxy
   nginx:
